@@ -34,7 +34,7 @@ TOP_PRIZES = {
 RESET_HOUR = 0
 RESET_MINUTE = 0
 
-ADMIN_ID = 123456789
+ADMIN_ID = 123456789  # замените на свой ID
 
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
@@ -509,9 +509,23 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=main_keyboard()
         )
 
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id != ADMIN_ID:
+        await update.message.reply_text("⛔ У вас нет доступа к данной команде.")
+        return
+    text = (
+        "👑 *Админ-панель*\n\n"
+        "Доступные команды:\n"
+        "/create_promo <код> <звёзды> – создать промокод на указанное количество звёзд\n"
+        "/admin – показать это меню\n\n"
+        "Также вы можете управлять ботом через базу данных."
+    )
+    await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+
 async def create_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("⛔ У вас нет прав для этой команды.")
+        await update.message.reply_text("⛔ У вас нет доступа к этой команде.")
         return
     if not context.args or len(context.args) < 2:
         await update.message.reply_text("Использование: /create_promo <код> <звёзды>")
@@ -539,26 +553,22 @@ async def main():
     global BOT_USERNAME
     me = await app.bot.get_me()
     BOT_USERNAME = me.username
+
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("admin", admin_panel))
     app.add_handler(CommandHandler("create_promo", create_promo))
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     app.job_queue.run_daily(daily_reset, time=time(hour=RESET_HOUR, minute=RESET_MINUTE))
+
     logging.info("Бот инициализирован и готов к работе")
 
     webhook_url = os.getenv("WEBHOOK_URL")
     if webhook_url:
         port = int(os.getenv("PORT", 8080))
-        await app.bot.set_webhook(url=webhook_url)
-        await app.initialize()
-        await app.start()
-        await app.updater.start_webhook(listen="0.0.0.0", port=port)
-        await asyncio.Event().wait()
+        await app.run_webhook(listen="0.0.0.0", port=port)
     else:
-        await app.initialize()
-        await app.start()
-        await app.updater.start_polling()
-        await asyncio.Event().wait()
+        await app.run_polling()
 
 if __name__ == "__main__":
     asyncio.run(main())
