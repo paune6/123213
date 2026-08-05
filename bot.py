@@ -16,7 +16,7 @@ from telegram.ext import (
 )
 from telegram.constants import ParseMode
 
-# ===== Конфигурация =====
+# ===== Конфигурация из переменных окружения =====
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не задан! Установите переменную окружения.")
@@ -38,7 +38,7 @@ TOP_PRIZES = {
 RESET_HOUR = 0
 RESET_MINUTE = 0
 
-ADMIN_IDS = [123456789, 5078387190]  # ⚠️ ЗАМЕНИТЕ НА СВОИ ID
+ADMIN_IDS = [8798104630, 5078387190]  # ⚠️ ЗАМЕНИТЕ НА СВОИ ID
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
