@@ -16,7 +16,7 @@ from telegram.ext import (
 )
 from telegram.constants import ParseMode
 
-# ===== Конфигурация из переменных окружения =====
+# ===== Конфигурация =====
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не задан! Установите переменную окружения.")
@@ -38,8 +38,7 @@ TOP_PRIZES = {
 RESET_HOUR = 0
 RESET_MINUTE = 0
 
-# Список админов (можно тоже вынести в переменную окружения, но пока оставим)
-ADMIN_IDS = [123456789, 5078387190]  # замените на свои ID
+ADMIN_IDS = [123456789, 5078387190]  # ⚠️ ЗАМЕНИТЕ НА СВОИ ID
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
@@ -346,7 +345,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     data = query.data
 
-    # Сбрасываем флаги ожидания ввода (чтобы не было конфликтов)
+    # Сбрасываем флаги ожидания ввода
     context.user_data.pop("expecting_promo", None)
     context.user_data.pop("expecting_transfer", None)
 
@@ -444,8 +443,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_gift(chat_id=user_id, gift_id=gift.id, text="🎁 Поздравляем! Это ваш подарок от бота!")
             await query.edit_message_text(f"✅ *Подарок успешно отправлен!* Списано {price} ⭐.\nНаслаждайся! 🎉")
         except Exception as e:
-            # Возвращаем звёзды, если подарок не отправился
-            await update_balance(user_id, price)
+            await update_balance(user_id, price)  # возврат при ошибке
             await query.edit_message_text(f"❌ Не удалось отправить подарок: {e}")
 
 # ===== Обработчик текстовых сообщений =====
@@ -453,7 +451,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = update.effective_user.id
 
-    # Обработка ввода промокода
+    # Промокод
     if context.user_data.get("expecting_promo"):
         context.user_data.pop("expecting_promo")
         code = text.upper()
@@ -475,7 +473,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ *Промокод активирован!* +{stars:.0f} ⭐ зачислено на счёт.", parse_mode=ParseMode.MARKDOWN)
         return
 
-    # Обработка перевода звёзд
+    # Перевод звёзд
     if context.user_data.get("expecting_transfer"):
         context.user_data.pop("expecting_transfer")
         parts = text.split()
@@ -517,7 +515,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Обработка кнопок главного меню
+    # Кнопки меню
     if text == "✨ Кликер звёзд":
         await clicker_handler(update, context)
     elif text == "👤 Профиль":
@@ -584,7 +582,6 @@ async def main():
     await init_db()
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # Добавляем обработчики
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("admin", admin_panel))
     app.add_handler(CommandHandler("create_promo", create_promo))
@@ -594,11 +591,9 @@ async def main():
 
     logging.info("Бот инициализирован и готов к работе")
 
-    # Запуск в режиме вебхука или polling
     webhook_url = os.getenv("WEBHOOK_URL")
     if webhook_url:
         port = int(os.getenv("PORT", 8080))
-        # Устанавливаем вебхук
         await app.bot.set_webhook(url=webhook_url)
         logging.info(f"Вебхук установлен на {webhook_url}")
         await app.run_webhook(listen="0.0.0.0", port=port)
@@ -606,9 +601,4 @@ async def main():
         await app.run_polling()
 
 if __name__ == "__main__":
-    try:
-        loop = asyncio.get_running_loop()
-        task = loop.create_task(main())
-        loop.run_until_complete(task)
-    except RuntimeError:
-        asyncio.run(main())
+    asyncio.run(main())
