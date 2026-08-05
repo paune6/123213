@@ -534,27 +534,17 @@ logging.basicConfig(level=logging.INFO)
 
 async def main():
     await init_db()
-
     app = Application.builder().token(BOT_TOKEN).build()
-
     global BOT_USERNAME
     me = await app.bot.get_me()
     BOT_USERNAME = me.username
-
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("create_promo", create_promo))
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
-
-    await app.initialize()
-
     app.job_queue.run_daily(daily_reset, time=time(hour=RESET_HOUR, minute=RESET_MINUTE))
-
     logging.info("Бот инициализирован и готов к работе")
-
-    await app.start()
-    await app.updater.start_polling()
-    await app.idle()
+    await app.run_polling()
 
 if __name__ == "__main__":
     asyncio.run(main())
