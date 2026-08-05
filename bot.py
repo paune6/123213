@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 from datetime import datetime, time
 from typing import Optional
 
@@ -181,7 +180,6 @@ def main_keyboard():
 
 # ---------- ОБРАБОТЧИКИ КОМАНД ----------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # УЛУЧШЕНО: новое приветствие с подробным описанием возможностей
     if not await check_subscription(update, context):
         return
 
@@ -201,7 +199,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if referrer:
                 await increment_referral(referrer_id)
                 await update_balance(referrer_id, REFERRAL_BONUS)
-        # Новое приветствие для нового пользователя
         welcome = (
             "🌟 *Добро пожаловать в бота «Звёздный Патрик»!* 🌟\n\n"
             "Я помогу тебе зарабатывать звёзды Telegram, которые можно обменивать на крутые подарки! 🎁\n\n"
@@ -217,7 +214,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "✨ *Удачи и больших заработков!* ✨"
         )
     else:
-        # Приветствие для возвращающегося пользователя
         welcome = (
             "👋 *С возвращением, друг!*\n"
             "Рад снова тебя видеть. Используй кнопки меню, чтобы продолжить зарабатывать звёзды.\n\n"
@@ -246,7 +242,6 @@ async def clicker_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
     await update_balance(user_id, CLICKER_REWARD)
     await set_field(user_id, "last_click_time", now.isoformat())
-    # УЛУЧШЕНО: более радостное сообщение
     await update.message.reply_text(
         f"✨ *Клик успешен!*\n\n"
         f"Вы получили *{CLICKER_REWARD:.2f} ⭐️* за специальное задание.\n"
@@ -256,7 +251,6 @@ async def clicker_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------- ПРОФИЛЬ ----------
 async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # УЛУЧШЕНО: более структурированный и красивый профиль
     if not await check_subscription(update, context):
         return
     user_id = update.effective_user.id
@@ -291,7 +285,6 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------- ЗАРАБОТАТЬ ЗВЕЗДЫ ----------
 async def earn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # УЛУЧШЕНО: более мотивирующий текст и понятные шаги
     if not await check_subscription(update, context):
         return
     user_id = update.effective_user.id
@@ -323,7 +316,6 @@ async def earn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------- ВЫВОД ЗВЕЗД ----------
 async def withdraw_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # УЛУЧШЕНО: четкие условия и приятный выбор подарков
     if not await check_subscription(update, context):
         return
     user_id = update.effective_user.id
@@ -353,7 +345,6 @@ async def withdraw_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------- ИНСТРУКЦИЯ ----------
 async def instruction_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # УЛУЧШЕНО: более подробная и структурированная инструкция
     if not await check_subscription(update, context):
         return
     text = (
@@ -371,7 +362,6 @@ async def instruction_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 # ---------- ТОП ----------
 async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # УЛУЧШЕНО: красивое оформление топа с пояснением наград
     if not await check_subscription(update, context):
         return
     user_id = update.effective_user.id
@@ -392,7 +382,6 @@ async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         text += "\n\n✨ Ты пока не в топе за сегодня. Приглашай больше друзей!"
 
-    # Пояснение призов
     prize_lines = []
     for pos, stars in TOP_PRIZES.items():
         medal = medals[pos-1] if pos <= 10 else f"{pos}."
@@ -582,7 +571,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Обработка кнопок меню (с новыми эмодзи)
+    # Обработка кнопок меню
     if text == "✨ Кликер звёзд":
         await clicker_handler(update, context)
     elif text == "👤 Профиль":
@@ -627,29 +616,42 @@ async def daily_reset(context: ContextTypes.DEFAULT_TYPE):
     prizes = await reset_daily_and_reward()
     logging.info(f"Топ сброшен, награды: {prizes}")
 
-# ---------- ЗАПУСК ----------
+# ---------- ЗАПУСК (ИСПРАВЛЕННАЯ ВЕРСИЯ) ----------
 logging.basicConfig(level=logging.INFO)
 
-async def setup():
-    """Инициализация БД, создание приложения и настройка обработчиков."""
+async def main():
+    # Инициализация БД
     await init_db()
+
+    # Создание приложения
     app = Application.builder().token(BOT_TOKEN).build()
 
+    # Получение имени бота
     global BOT_USERNAME
     me = await app.bot.get_me()
     BOT_USERNAME = me.username
 
+    # Добавление обработчиков
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("create_promo", create_promo))
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
-    job_queue = app.job_queue
-    job_queue.run_daily(daily_reset, time=time(hour=RESET_HOUR, minute=RESET_MINUTE))
+    # Инициализация приложения (создаёт job_queue)
+    await app.initialize()
 
-    logging.info("Бот инициализирован")
-    return app
+    # Планирование ежедневного сброса топа
+    app.job_queue.run_daily(daily_reset, time=time(hour=RESET_HOUR, minute=RESET_MINUTE))
+
+    logging.info("Бот инициализирован и готов к работе")
+
+    # Запуск поллинга (асинхронно)
+    await app.start()
+    await app.updater.start_polling()
+
+    # Бесконечное ожидание
+    while True:
+        await asyncio.sleep(3600)
 
 if __name__ == "__main__":
-    app = asyncio.run(setup())
-    asyncio.run(app.run_polling())
+    asyncio.run(main())
