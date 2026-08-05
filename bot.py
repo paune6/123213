@@ -19,7 +19,7 @@ BOT_TOKEN = "8675621032:AAHKU2EeS0GMw5eWCG8T-zMYYVv6vLvUiN0"  # ваш токе�
 DB_PATH = "bot_database.db"
 BOT_USERNAME = None
 
-REQUIRED_CHANNELS = ["@pavelgifsts"]  # Только этот канал
+# Подписка полностью удалена – больше нет REQUIRED_CHANNELS
 
 CLICKER_COOLDOWN = 180
 CLICKER_REWARD = 0.20
@@ -214,36 +214,6 @@ async def reject_request(request_id):
         await db.commit()
         return user_id, amount
 
-# ---------- ПРОВЕРКА ПОДПИСКИ ----------
-async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    user_id = update.effective_user.id
-    not_subscribed = []
-    for channel in REQUIRED_CHANNELS:
-        try:
-            member = await context.bot.get_chat_member(channel, user_id)
-            if member.status in ("left", "kicked"):
-                not_subscribed.append(channel)
-        except Exception:
-            not_subscribed.append(channel)
-
-    if not_subscribed:
-        channels_text = ", ".join(not_subscribed)
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton(f"📢 Подписаться на {ch}", url=f"https://t.me/{ch[1:]}")]
-            for ch in not_subscribed
-        ])
-        text = (
-            f"❌ Для использования бота необходимо подписаться на канал:\n"
-            f"{channels_text}\n\n"
-            f"После подписки вернитесь и нажмите /start или любую кнопку меню."
-        )
-        if update.message:
-            await update.message.reply_text(text, reply_markup=keyboard)
-        elif update.callback_query:
-            await update.callback_query.edit_message_text(text, reply_markup=keyboard)
-        return False
-    return True
-
 # ---------- КЛАВИАТУРЫ ----------
 def main_keyboard():
     return ReplyKeyboardMarkup(
@@ -267,9 +237,6 @@ def admin_keyboard():
 
 # ---------- ОБРАБОТЧИКИ ----------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_subscription(update, context):
-        return
-
     user = update.effective_user
     user_id = user.id
     args = context.args
@@ -323,8 +290,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_photo(photo=photo_url, caption=caption, parse_mode=ParseMode.MARKDOWN, reply_markup=main_keyboard())
 
 async def clicker_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_subscription(update, context):
-        return
     user_id = update.effective_user.id
     user = await get_user(user_id)
     if not user:
@@ -344,8 +309,6 @@ async def clicker_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✨ Специальное задание!\nНаграда: {CLICKER_REWARD:.2f} ⭐️\nБаланс пополнен!")
 
 async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_subscription(update, context):
-        return
     user_id = update.effective_user.id
     user = await get_user(user_id)
     if not user:
@@ -381,8 +344,6 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
 
 async def earn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_subscription(update, context):
-        return
     user_id = update.effective_user.id
     user = await get_user(user_id)
     if not user:
@@ -408,8 +369,6 @@ async def earn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
 
 async def withdraw_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_subscription(update, context):
-        return
     user_id = update.effective_user.id
     user = await get_user(user_id)
     if not user:
@@ -418,9 +377,7 @@ async def withdraw_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     balance = user[3]
     text = (
         f"💰 *Ваш баланс:* {balance:.2f} ⭐️\n\n"
-        f"‼️ Для вывода требуется:\n"
-        f"— Минимум 5 приглашённых друзей, активировавших бота\n"
-        f"— Быть подписанным на @pavelgifsts\n\n"
+        f"‼️ Для вывода требуется минимум 5 приглашённых друзей, активировавших бота.\n\n"
         f"✅ *Выберите подарок, и создастся заявка на вывод:*"
     )
     gifts = [
@@ -435,8 +392,6 @@ async def withdraw_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
 
 async def instruction_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_subscription(update, context):
-        return
     text = (
         "📘 *Как набрать много переходов по ссылке?*\n"
         "• Отправь её друзьям в личные сообщения 👥\n"
@@ -447,8 +402,6 @@ async def instruction_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
 async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_subscription(update, context):
-        return
     user_id = update.effective_user.id
     top = await get_top10_daily()
     medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
@@ -474,13 +427,9 @@ async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
 async def reviews_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_subscription(update, context):
-        return
     await update.message.reply_text("⭐ Наш канал отзывов: https://t.me/repa_yherova")
 
 async def daily_task_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_subscription(update, context):
-        return
     text = await get_daily_task_text()
     await update.message.reply_text(f"📋 *Задание дня:*\n{text}", parse_mode=ParseMode.MARKDOWN)
 
@@ -490,9 +439,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     user_id = query.from_user.id
     data = query.data
-
-    if not await check_subscription(update, context):
-        return
 
     if data == "promo":
         context.user_data["expecting_promo"] = True
@@ -645,9 +591,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = update.effective_user.id
-
-    if not await check_subscription(update, context):
-        return
 
     if context.user_data.get("expecting_promo"):
         context.user_data.pop("expecting_promo")
@@ -831,7 +774,6 @@ async def setup():
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
-    # Настройка JobQueue (если установлен)
     job_queue = app.job_queue
     if job_queue:
         job_queue.run_daily(daily_reset, time=time(hour=RESET_HOUR, minute=RESET_MINUTE))
