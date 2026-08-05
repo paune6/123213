@@ -16,10 +16,10 @@ from telegram.ext import (
 )
 from telegram.constants import ParseMode
 
-# ===== Конфигурация из переменных окружения =====
+# ===== Конфигурация =====
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN не задан! Установите переменную окружения.")
+    raise ValueError("BOT_TOKEN не задан!")
 
 DB_PATH = "bot_database.db"
 
@@ -38,12 +38,12 @@ TOP_PRIZES = {
 RESET_HOUR = 0
 RESET_MINUTE = 0
 
-ADMIN_IDS = [8798104630, 5078387190]  # ⚠️ ЗАМЕНИТЕ НА СВОИ ID
+ADMIN_IDS = [8798104630, 5078387190]  # ЗАМЕНИ НА СВОИ
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
 
-# ===== Работа с БД =====
+# ===== БД =====
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('''
@@ -338,14 +338,13 @@ async def reviews_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.MARKDOWN
     )
 
-# ===== Callback-обработчик =====
+# ===== Callback =====
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
     data = query.data
 
-    # Сбрасываем флаги ожидания ввода
     context.user_data.pop("expecting_promo", None)
     context.user_data.pop("expecting_transfer", None)
 
@@ -443,15 +442,14 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_gift(chat_id=user_id, gift_id=gift.id, text="🎁 Поздравляем! Это ваш подарок от бота!")
             await query.edit_message_text(f"✅ *Подарок успешно отправлен!* Списано {price} ⭐.\nНаслаждайся! 🎉")
         except Exception as e:
-            await update_balance(user_id, price)  # возврат при ошибке
+            await update_balance(user_id, price)
             await query.edit_message_text(f"❌ Не удалось отправить подарок: {e}")
 
-# ===== Обработчик текстовых сообщений =====
+# ===== Обработчик текста =====
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = update.effective_user.id
 
-    # Промокод
     if context.user_data.get("expecting_promo"):
         context.user_data.pop("expecting_promo")
         code = text.upper()
@@ -473,7 +471,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ *Промокод активирован!* +{stars:.0f} ⭐ зачислено на счёт.", parse_mode=ParseMode.MARKDOWN)
         return
 
-    # Перевод звёзд
     if context.user_data.get("expecting_transfer"):
         context.user_data.pop("expecting_transfer")
         parts = text.split()
@@ -515,7 +512,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Кнопки меню
     if text == "✨ Кликер звёзд":
         await clicker_handler(update, context)
     elif text == "👤 Профиль":
@@ -570,22 +566,25 @@ async def create_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await db.commit()
     await update.message.reply_text(f"✅ Промокод *{code}* на *{stars} ⭐* создан!", parse_mode=ParseMode.MARKDOWN)
 
-# ===== Ежедневный сброс =====
 async def daily_reset(context: ContextTypes.DEFAULT_TYPE):
     prizes = await reset_daily_and_reward()
     logging.info(f"Топ сброшен, награды: {prizes}")
 
-# ===== ИСПРАВЛЕННАЯ ОСНОВНАЯ ФУНКЦИЯ =====
+# ===== ГЛАВНАЯ ФУНКЦИЯ (с ручным циклом) =====
 logging.basicConfig(level=logging.INFO)
 
 def main():
-    # 1. Инициализация БД (однократная асинхронная операция)
-    asyncio.run(init_db())
+    # Создаём и устанавливаем цикл событий
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
-    # 2. Создаём приложение
+    # Инициализация БД
+    loop.run_until_complete(init_db())
+
+    # Сборка приложения
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # 3. Регистрируем обработчики
+    # Регистрация обработчиков
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("admin", admin_panel))
     app.add_handler(CommandHandler("create_promo", create_promo))
@@ -595,16 +594,13 @@ def main():
 
     logging.info("Бот инициализирован и готов к работе")
 
-    # 4. Запуск: polling или webhook
+    # Запуск
     webhook_url = os.getenv("WEBHOOK_URL")
     if webhook_url:
-        # Установка вебхука (асинхронно)
-        asyncio.run(app.bot.set_webhook(url=webhook_url))
+        loop.run_until_complete(app.bot.set_webhook(url=webhook_url))
         port = int(os.getenv("PORT", 8080))
-        # run_webhook – синхронный метод, вызываем напрямую
         app.run_webhook(listen="0.0.0.0", port=port)
     else:
-        # run_polling – синхронный метод
         app.run_polling()
 
 if __name__ == "__main__":
