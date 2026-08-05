@@ -21,7 +21,8 @@ BOT_TOKEN = "8675621032:AAHKU2EeS0GMw5eWCG8T-zMYYVv6vLvUiN0"  # ваш токе�
 DB_PATH = "bot_database.db"
 BOT_USERNAME = None
 
-REQUIRED_CHANNELS = ["@mpvpavlo", "@pavelgifsts"]  # каналы для обязательной подписки
+# ID каналов (числовые, отрицательные)
+REQUIRED_CHANNELS = [-1003989098447, -1004427293767]
 
 # Настройки кликера
 CLICKER_COOLDOWN = 180  # 3 минуты
@@ -151,16 +152,17 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
             not_subscribed.append(channel)
 
     if not_subscribed:
-        channels_text = ", ".join(not_subscribed)
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton(f"Подписаться на {ch}", url=f"https://t.me/{ch[1:]}")]
-            for ch in not_subscribed
-        ])
-        text = f"❌ Для использования бота необходимо подписаться на каналы:\n{channels_text}\n\nПосле подписки вернитесь и нажмите /start или любую кнопку меню."
+        # Так как каналы заданы ID, ссылки на подписку сделать нельзя.
+        # Выводим текст с просьбой подписаться.
+        text = "❌ Для использования бота необходимо подписаться на каналы.\n\n"
+        text += "Пожалуйста, подпишитесь на следующие каналы (найдите их по ID или названию):\n"
+        for ch in not_subscribed:
+            text += f"• Канал ID: {ch}\n"
+        text += "\nПосле подписки вернитесь и нажмите /start или любую кнопку меню."
         if update.message:
-            await update.message.reply_text(text, reply_markup=keyboard)
+            await update.message.reply_text(text)
         elif update.callback_query:
-            await update.callback_query.edit_message_text(text, reply_markup=keyboard)
+            await update.callback_query.edit_message_text(text)
         return False
     return True
 
@@ -300,7 +302,7 @@ async def withdraw_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💰 Баланс: {balance:.2f} ⭐️\n\n"
         f"‼️ Для вывода требуется:\n"
         f"— Минимум 5 приглашённых друзей, активировавших бота\n"
-        f"— Быть подписанным на @mpvpavlo и @pavelgifsts\n\n"
+        f"— Быть подписанным на обязательные каналы\n\n"   # изменено
         f"✅ Моментальный автоматический вывод!\n"
         f"Выбери подарок:"
     )
