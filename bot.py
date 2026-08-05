@@ -14,34 +14,27 @@ from telegram.ext import (
 )
 from telegram.constants import ParseMode
 
-# ---------- НАСТРОЙКИ ----------
-BOT_TOKEN = "8675621032:AAHKU2EeS0GMw5eWCG8T-zMYYVv6vLvUiN0"  # ваш токен
+BOT_TOKEN = "8675621032:AAHKU2EeS0GMw5eWCG8T-zMYYVv6vLvUiN0"
 DB_PATH = "bot_database.db"
 BOT_USERNAME = None
 
-# Настройки кликера
-CLICKER_COOLDOWN = 180  # 3 минуты
+CLICKER_COOLDOWN = 180
 CLICKER_REWARD = 0.20
 
-# Реферальные бонусы
 REFERRAL_BONUS = 3.0
 OLD_FRIENDS_BONUS = 2.0
 DAILY_BIO_BONUS = 1.0
 
-# Призы топа
 TOP_PRIZES = {
     1: 200, 2: 100, 3: 50, 4: 40, 5: 35,
     6: 30, 7: 25, 8: 20, 9: 15, 10: 10,
 }
 
-# Время сброса топа (UTC)
 RESET_HOUR = 0
 RESET_MINUTE = 0
 
-# ID администратора (для create_promo) – измените на свой
-ADMIN_ID = 123456789  # замените на ваш Telegram ID
+ADMIN_ID = 123456789
 
-# ---------- БАЗА ДАННЫХ ----------
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('''
@@ -68,7 +61,6 @@ async def init_db():
         ''')
         await db.commit()
 
-# ---------- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ БД ----------
 async def get_user(user_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT * FROM users WHERE user_id=?", (user_id,)) as cursor:
@@ -110,20 +102,21 @@ async def get_top10_daily():
 
 async def get_user_rank_daily(user_id):
     async with aiosqlite.connect(DB_PATH) as db:
-        row = await db.execute_fetchall("SELECT daily_invites FROM users WHERE user_id=?", (user_id,))
-        if not row or row[0][0] == 0:
+        cursor = await db.execute("SELECT daily_invites FROM users WHERE user_id=?", (user_id,))
+        row = await cursor.fetchone()
+        if not row or row[0] == 0:
             return 0
-        user_invites = row[0][0]
-        count = await db.execute_fetchall(
-            "SELECT COUNT(*) FROM users WHERE daily_invites > ?", (user_invites,)
-        )
-        return count[0][0] + 1
+        user_invites = row[0]
+        cursor = await db.execute("SELECT COUNT(*) FROM users WHERE daily_invites > ?", (user_invites,))
+        count = await cursor.fetchone()
+        return count[0] + 1
 
 async def reset_daily_and_reward():
     async with aiosqlite.connect(DB_PATH) as db:
-        top = await db.execute_fetchall(
+        cursor = await db.execute(
             "SELECT user_id, daily_invites FROM users WHERE daily_invites > 0 ORDER BY daily_invites DESC LIMIT 10"
         )
+        top = await cursor.fetchall()
         prizes = {}
         for idx, (uid, count) in enumerate(top, start=1):
             if idx in TOP_PRIZES:
@@ -134,7 +127,6 @@ async def reset_daily_and_reward():
         await db.commit()
         return prizes
 
-# ---------- ГЛАВНОЕ МЕНЮ ----------
 def main_keyboard():
     return ReplyKeyboardMarkup(
         [
@@ -145,7 +137,6 @@ def main_keyboard():
         resize_keyboard=True
     )
 
-# ---------- ОБРАБОТЧИКИ КОМАНД ----------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
@@ -164,29 +155,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await increment_referral(referrer_id)
                 await update_balance(referrer_id, REFERRAL_BONUS)
         welcome = (
-            "🌟 *Добро пожаловать в бота «Звёздный Патрик»!* 🌟\n\n"
-            "Я помогу тебе зарабатывать звёзды Telegram, которые можно обменивать на крутые подарки! 🎁\n\n"
-            "🔹 *Что ты можешь делать:*\n"
-            "• Нажимать кнопку «Кликер звёзд» каждые 3 минуты и получать +0.20 ⭐️\n"
-            "• Приглашать друзей – за каждого нового пользователя ты получишь *3 ⭐️*\n"
-            "• Участвовать в ежедневном топе – лучшие приглашающие получают до *200 ⭐️*\n"
-            "• Выводить звёзды на реальные подарки (мишки, розы, шампанское и многое другое!)\n"
-            "• Получать ежедневный бонус +1 ⭐️, если твоя реферальная ссылка есть в описании профиля\n\n"
-            "👉 Нажми кнопку «Профиль», чтобы увидеть свой баланс и активировать бонусы.\n"
-            "👉 Кнопка «Заработать звёзды» покажет твою личную ссылку для приглашений.\n"
-            "👉 «Вывод звёзд» – выбирай подарок и забирай награду!\n\n"
-            "✨ *Удачи и больших заработков!* ✨"
+            "🌟 Привет! Я бот для заработка звёзд Telegram.\n"
+            "Используй кнопки меню, чтобы начать.\n\n"
+            "Кратко:\n"
+            "• Кликер – +0.20 ⭐ каждые 3 минуты\n"
+            "• Приглашай друзей – +3 ⭐ за каждого\n"
+            "• Топ 10 – призы до 200 ⭐ в конце дня\n"
+            "• Выводи звёзды на подарки\n"
+            "• Ежедневный бонус +1 ⭐ за ссылку в профиле\n\n"
+            "Удачи!"
         )
     else:
-        welcome = (
-            "👋 *С возвращением, друг!*\n"
-            "Рад снова тебя видеть. Используй кнопки меню, чтобы продолжить зарабатывать звёзды.\n\n"
-            "🔥 Не забывай приглашать друзей и подниматься в топе!"
-        )
+        welcome = "👋 С возвращением! Используй кнопки меню."
 
     await update.message.reply_text(welcome, parse_mode=ParseMode.MARKDOWN, reply_markup=main_keyboard())
 
-# ---------- КЛИКЕР ----------
 async def clicker_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user = await get_user(user_id)
@@ -205,13 +188,11 @@ async def clicker_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update_balance(user_id, CLICKER_REWARD)
     await set_field(user_id, "last_click_time", now.isoformat())
     await update.message.reply_text(
-        f"✨ *Клик успешен!*\n\n"
-        f"Вы получили *{CLICKER_REWARD:.2f} ⭐️* за специальное задание.\n"
+        f"✨ Клик успешен!\n\nВы получили *{CLICKER_REWARD:.2f} ⭐* за специальное задание.\n"
         f"Твой баланс пополнен. Возвращайся через 3 минуты за новой наградой! 🚀",
         parse_mode=ParseMode.MARKDOWN
     )
 
-# ---------- ПРОФИЛЬ ----------
 async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user = await get_user(user_id)
@@ -229,21 +210,20 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"──────────────\n"
         f"👥 Всего друзей: *{total_inv}*\n"
         f"✅ Активировали бота: *{activated}*\n"
-        f"💰 Баланс: *{balance:.2f} ⭐️*\n\n"
-        f"📌 *Как получить ежедневный бонус?*\n"
+        f"💰 Баланс: *{balance:.2f} ⭐*\n\n"
+        f"📌 Как получить ежедневный бонус?\n"
         f"Добавь свою реферальную ссылку в описание профиля Telegram "
-        f"и получай *+{DAILY_BIO_BONUS:.0f} ⭐️* каждый день.\n\n"
-        f"⬇️ *Доступные действия:*"
+        f"и получай *+{DAILY_BIO_BONUS:.0f} ⭐* каждый день.\n\n"
+        f"⬇️ Доступные действия:"
     )
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🎁 Ввести промокод", callback_data="promo")],
         [InlineKeyboardButton("☀️ Ежедневный бонус", callback_data="daily_bonus")],
         [InlineKeyboardButton("💸 Отправить звёзды другу", callback_data="send_stars")],
-        [InlineKeyboardButton("➕ +2⭐️ за старых друзей", callback_data="old_friends")],
+        [InlineKeyboardButton("➕ +2⭐ за старых друзей", callback_data="old_friends")],
     ])
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
 
-# ---------- ЗАРАБОТАТЬ ЗВЕЗДЫ ----------
 async def earn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user = await get_user(user_id)
@@ -254,7 +234,7 @@ async def earn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         "🚀 *Приглашай друзей и зарабатывай звёзды!*\n\n"
         f"За каждого нового пользователя, который перешёл по твоей ссылке и активировал бота, "
-        f"ты получаешь *{REFERRAL_BONUS:.0f} ⭐️*!\n\n"
+        f"ты получаешь *{REFERRAL_BONUS:.0f} ⭐*!\n\n"
         "🔗 *Твоя личная ссылка (нажми, чтобы скопировать):*\n"
         f"`{ref_link}`\n\n"
         "📢 *Где и как распространять ссылку:*\n"
@@ -265,14 +245,13 @@ async def earn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "💡 *Совет:* чем активнее ты приглашаешь, тем выше твой рейтинг в топе, "
         "а значит, ты можешь получить ещё больше звёзд в конце дня!\n\n"
         "❗️ Если у тебя уже есть друзья, которые давно пользуются ботом, "
-        "нажми кнопку ниже и получи бонус *+2⭐️* за каждого старого друга."
+        "нажми кнопку ниже и получи бонус *+2⭐* за каждого старого друга."
     )
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("➕ +2⭐️ за старых друзей", callback_data="old_friends")]
+        [InlineKeyboardButton("➕ +2⭐ за старых друзей", callback_data="old_friends")]
     ])
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
 
-# ---------- ВЫВОД ЗВЕЗД ----------
 async def withdraw_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user = await get_user(user_id)
@@ -282,38 +261,36 @@ async def withdraw_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     balance = user[3]
     text = (
         f"🎁 *Вывод звёзд на подарки*\n\n"
-        f"💰 Твой баланс: *{balance:.2f} ⭐️*\n\n"
+        f"💰 Твой баланс: *{balance:.2f} ⭐*\n\n"
         "📋 *Условие вывода:*\n"
         "• Минимум 5 приглашённых друзей (активировавших бота)\n\n"
         "✅ Вывод происходит мгновенно! Выбери желаемый подарок ниже:"
     )
     gifts = [
-        ("🧸 15⭐️ – Мишка-сердце", "gift_15"),
-        ("🌹 25⭐️ – Роза", "gift_25"),
-        ("🍾 50⭐️ – Шампанское / Букет / Ракета / Торт", "gift_50"),
-        ("🏆 100⭐️ – Кубок / Кольцо / Алмаз", "gift_100"),
+        ("🧸 15⭐ – Мишка-сердце", "gift_15"),
+        ("🌹 25⭐ – Роза", "gift_25"),
+        ("🍾 50⭐ – Шампанское / Букет / Ракета / Торт", "gift_50"),
+        ("🏆 100⭐ – Кубок / Кольцо / Алмаз", "gift_100"),
     ]
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton(name, callback_data=code)] for name, code in gifts
     ])
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
 
-# ---------- ИНСТРУКЦИЯ ----------
 async def instruction_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         "📖 *Инструкция по использованию бота*\n\n"
-        "1️⃣ *Кликер звёзд* – нажимай каждые 3 минуты и получай +0.20 ⭐️.\n"
-        "2️⃣ *Заработок* – приглашай друзей по своей ссылке, получай +3 ⭐️ за каждого.\n"
+        "1️⃣ *Кликер звёзд* – нажимай каждые 3 минуты и получай +0.20 ⭐.\n"
+        "2️⃣ *Заработок* – приглашай друзей по своей ссылке, получай +3 ⭐ за каждого.\n"
         "3️⃣ *Топ* – чем больше друзей ты приведешь за день, тем выше в топе. "
-        "В конце дня лучшие 10 получают призы от 10 до 200 ⭐️.\n"
+        "В конце дня лучшие 10 получают призы от 10 до 200 ⭐.\n"
         "4️⃣ *Вывод* – обменивай звёзды на реальные подарки Telegram.\n"
-        "5️⃣ *Бонусы* – добавляй ссылку в описание профиля и забирай +1 ⭐️ ежедневно, "
-        "а также +2 ⭐️ за каждого уже приглашённого друга (однократно).\n\n"
+        "5️⃣ *Бонусы* – добавляй ссылку в описание профиля и забирай +1 ⭐ ежедневно, "
+        "а также +2 ⭐ за каждого уже приглашённого друга (однократно).\n\n"
         "🔥 *Совет:* активные участники зарабатывают больше! Приглашай как можно больше людей."
     )
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
-# ---------- ТОП ----------
 async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     top = await get_top10_daily()
@@ -336,12 +313,11 @@ async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     prize_lines = []
     for pos, stars in TOP_PRIZES.items():
         medal = medals[pos-1] if pos <= 10 else f"{pos}."
-        prize_lines.append(f"{medal} – {stars} ⭐️")
+        prize_lines.append(f"{medal} – {stars} ⭐")
     text += "\n\n🎁 *Награды за 1–10 места в конце дня:*\n" + "\n".join(prize_lines)
 
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
-# ---------- ОТЗЫВЫ ----------
 async def reviews_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "⭐ *Отзывы о боте*\n\n"
@@ -350,7 +326,6 @@ async def reviews_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.MARKDOWN
     )
 
-# ---------- ОБРАБОТКА CALLBACK-ЗАПРОСОВ ----------
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -382,7 +357,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if ref_link in bio:
             await update_balance(user_id, DAILY_BIO_BONUS)
             await set_field(user_id, "last_daily_bonus", now.isoformat())
-            await query.edit_message_text(f"✅ *Бонус зачислен!* +{DAILY_BIO_BONUS:.0f} ⭐️")
+            await query.edit_message_text(f"✅ *Бонус зачислен!* +{DAILY_BIO_BONUS:.0f} ⭐")
         else:
             await query.edit_message_text(
                 "❌ Не удалось найти твою реферальную ссылку в описании профиля.\n"
@@ -414,7 +389,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         await update_balance(user_id, OLD_FRIENDS_BONUS)
         await set_field(user_id, "claimed_old_friends_bonus", 1)
-        await query.edit_message_text(f"✅ *Бонус за старых друзей зачислен!* +{OLD_FRIENDS_BONUS:.0f} ⭐️")
+        await query.edit_message_text(f"✅ *Бонус за старых друзей зачислен!* +{OLD_FRIENDS_BONUS:.0f} ⭐")
         return
     elif data.startswith("gift_"):
         prices = {"gift_15": 15, "gift_25": 25, "gift_50": 50, "gift_100": 100}
@@ -433,7 +408,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
         if user[3] < price:
-            await query.edit_message_text(f"❌ Недостаточно звёзд. Нужно {price} ⭐️, у тебя {user[3]:.2f}.")
+            await query.edit_message_text(f"❌ Недостаточно звёзд. Нужно {price} ⭐, у тебя {user[3]:.2f}.")
             return
         try:
             available = await context.bot.get_available_gifts()
@@ -442,18 +417,17 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         matching = [g for g in available if g.total_amount == price]
         if not matching:
-            await query.edit_message_text(f"❌ К сожалению, подарков стоимостью {price} ⭐️ сейчас нет в наличии.")
+            await query.edit_message_text(f"❌ К сожалению, подарков стоимостью {price} ⭐ сейчас нет в наличии.")
             return
         gift = matching[0]
         await update_balance(user_id, -price)
         try:
-            await context.bot.send_gift(chat_id=user_id, gift_id=gift.id, text="🎁 Поздравляем! Это ваш подарок от бота «Звёздный Патрик»!")
-            await query.edit_message_text(f"✅ *Подарок успешно отправлен!* Списано {price} ⭐️.\nНаслаждайся! 🎉")
+            await context.bot.send_gift(chat_id=user_id, gift_id=gift.id, text="🎁 Поздравляем! Это ваш подарок от бота!")
+            await query.edit_message_text(f"✅ *Подарок успешно отправлен!* Списано {price} ⭐.\nНаслаждайся! 🎉")
         except Exception as e:
             await update_balance(user_id, price)
             await query.edit_message_text(f"❌ Не удалось отправить подарок: {e}")
 
-# ---------- ОБРАБОТКА ТЕКСТОВЫХ СООБЩЕНИЙ ----------
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = update.effective_user.id
@@ -462,8 +436,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop("expecting_promo")
         code = text.upper()
         async with aiosqlite.connect(DB_PATH) as db:
-            async with db.execute("SELECT stars, used_by FROM promos WHERE code=?", (code,)) as cursor:
-                promo = await cursor.fetchone()
+            cursor = await db.execute("SELECT stars, used_by FROM promos WHERE code=?", (code,))
+            promo = await cursor.fetchone()
             if not promo:
                 await update.message.reply_text("❌ Неверный промокод. Попробуйте ещё раз.")
                 return
@@ -476,7 +450,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await db.execute("UPDATE promos SET used_by=? WHERE code=?", (",".join(used), code))
             await db.commit()
         await update_balance(user_id, stars)
-        await update.message.reply_text(f"✅ *Промокод активирован!* +{stars:.0f} ⭐️ зачислено на счёт.", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(f"✅ *Промокод активирован!* +{stars:.0f} ⭐ зачислено на счёт.", parse_mode=ParseMode.MARKDOWN)
         return
 
     if context.user_data.get("expecting_transfer"):
@@ -509,12 +483,11 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update_balance(target_id, amount)
         await update.message.reply_text(
             f"✅ *Перевод выполнен!*\n"
-            f"Переведено {amount:.2f} ⭐️ пользователю ID `{target_id}`.",
+            f"Переведено {amount:.2f} ⭐ пользователю ID `{target_id}`.",
             parse_mode=ParseMode.MARKDOWN
         )
         return
 
-    # Обработка кнопок меню
     if text == "✨ Кликер звёзд":
         await clicker_handler(update, context)
     elif text == "👤 Профиль":
@@ -535,7 +508,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=main_keyboard()
         )
 
-# ---------- АДМИН-КОМАНДА: СОЗДАНИЕ ПРОМОКОДА ----------
 async def create_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("⛔ У вас нет прав для этой команды.")
@@ -552,49 +524,37 @@ async def create_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("INSERT OR REPLACE INTO promos(code, stars, used_by) VALUES(?,?,?)", (code, stars, ""))
         await db.commit()
-    await update.message.reply_text(f"✅ Промокод *{code}* на *{stars} ⭐️* создан!", parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text(f"✅ Промокод *{code}* на *{stars} ⭐* создан!", parse_mode=ParseMode.MARKDOWN)
 
-# ---------- ЕЖЕДНЕВНЫЙ СБРОС ТОПА ----------
 async def daily_reset(context: ContextTypes.DEFAULT_TYPE):
     prizes = await reset_daily_and_reward()
     logging.info(f"Топ сброшен, награды: {prizes}")
 
-# ---------- ЗАПУСК (ИСПРАВЛЕННАЯ ВЕРСИЯ) ----------
 logging.basicConfig(level=logging.INFO)
 
 async def main():
-    # Инициализация БД
     await init_db()
 
-    # Создание приложения
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # Получение имени бота
     global BOT_USERNAME
     me = await app.bot.get_me()
     BOT_USERNAME = me.username
 
-    # Добавление обработчиков
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("create_promo", create_promo))
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
-    # Инициализация приложения (создаёт job_queue)
     await app.initialize()
 
-    # Планирование ежедневного сброса топа
     app.job_queue.run_daily(daily_reset, time=time(hour=RESET_HOUR, minute=RESET_MINUTE))
 
     logging.info("Бот инициализирован и готов к работе")
 
-    # Запуск поллинга (асинхронно)
     await app.start()
     await app.updater.start_polling()
-
-    # Бесконечное ожидание
-    while True:
-        await asyncio.sleep(3600)
+    await app.idle()
 
 if __name__ == "__main__":
     asyncio.run(main())
