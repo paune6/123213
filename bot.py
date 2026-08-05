@@ -575,12 +575,12 @@ async def main():
         await app.run_polling()
 
 if __name__ == "__main__":
-    # Создаём новый цикл событий для изоляции
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    # Проверяем, запущен ли уже цикл событий (например, на хостинге)
     try:
-        loop.run_until_complete(main())
-    except KeyboardInterrupt:
-        logging.info("Бот остановлен пользователем")
-    finally:
-        loop.close()
+        loop = asyncio.get_running_loop()
+        # Если цикл уже запущен, создаем задачу и ждем её завершения
+        task = loop.create_task(main())
+        loop.run_until_complete(task)
+    except RuntimeError:
+        # Если цикла нет, запускаем новый
+        asyncio.run(main())
