@@ -550,16 +550,15 @@ async def main():
     if webhook_url:
         port = int(os.getenv("PORT", 8080))
         await app.bot.set_webhook(url=webhook_url)
-        await app.run_webhook(listen="0.0.0.0", port=port)
+        await app.initialize()
+        await app.start()
+        await app.updater.start_webhook(listen="0.0.0.0", port=port)
+        await asyncio.Event().wait()
     else:
-        await app.run_polling()
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling()
+        await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except RuntimeError as e:
-        if "already running" in str(e):
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(main())
-        else:
-            raise
+    asyncio.run(main())
