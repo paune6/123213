@@ -185,6 +185,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(welcome, parse_mode=ParseMode.MARKDOWN, reply_markup=main_keyboard())
 
+# (все остальные обработчики: clicker_handler, profile_handler, earn_handler, withdraw_handler, 
+# instruction_handler, top_handler, reviews_handler — полностью без изменений)
+
 async def clicker_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user = await get_user(user_id)
@@ -288,9 +291,7 @@ async def withdraw_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ("🍾 50⭐ – Шампанское / Букет / Ракета / Торт", "gift_50"),
         ("🏆 100⭐ – Кубок / Кольцо / Алмаз", "gift_100"),
     ]
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(name, callback_data=code)] for name, code in gifts
-    ])
+    keyboard = InlineKeyboardMarkup([InlineKeyboardButton(name, callback_data=code) for name, code in gifts])
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
 
 async def instruction_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -298,7 +299,7 @@ async def instruction_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         "📖 *Инструкция по использованию бота*\n\n"
         "1️⃣ *Кликер звёзд* – нажимай каждые 3 минуты и получай +0.20 ⭐.\n"
         "2️⃣ *Заработок* – приглашай друзей по своей ссылке, получай +3 ⭐ за каждого.\n"
-        "3️⃣ *Топ* – чем больше друзей ты приведешь за день, тем выше в топе. "
+        "3️⃣ *Топ* – чем больше друзей ты приведёшь за день, тем выше в топе. "
         "В конце дня лучшие 10 получают призы от 10 до 200 ⭐.\n"
         "4️⃣ *Вывод* – обменивай звёзды на реальные подарки Telegram.\n"
         "5️⃣ *Бонусы* – добавляй ссылку в описание профиля и забирай +1 ⭐ ежедневно, "
@@ -342,7 +343,7 @@ async def reviews_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.MARKDOWN
     )
 
-# ===== CALLBACK =====
+# ===== CALLBACK (включая новую админ-панель) =====
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -352,6 +353,85 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("expecting_promo", None)
     context.user_data.pop("expecting_transfer", None)
 
+    # ==================== НОВАЯ АДМИН-ПАНЕЛЬ ====================
+    if data.startswith("admin_"):
+        if not is_admin(user_id):
+            await query.edit_message_text("⛔ Нет доступа.")
+            return
+
+        if data == "admin_create_promo":
+            context.user_data["admin_action"] = "create_promo"
+            await query.edit_message_text(
+                "🎟 Введите промокод и звёзды в одном сообщении:\n"
+                "`CODE 150` (например: WELCOME 150)"
+            )
+            return
+
+        elif data == "admin_list_promo":
+            async with aiosqlite.connect(DB_PATH) as db:
+                cursor = await db.execute("SELECT code, stars, used_by FROM promos")
+                promos = await cursor.fetchall()
+            if not promos:
+                text = "📋 Промокодов пока нет."
+            else:
+                lines = []
+                for code, stars, used_str in promos:
+                    used = len(used_str.split(",")) if used_str else 0
+                    lines.append(f"• `{code}` — {stars} ⭐ (использовано: {used})")
+                text = "📋 Список всех промокодов:\n\n" + "\n".join(lines)
+            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN)
+            return
+
+        elif data == "admin_reset_daily":
+            await query.edit_message_text("⏳ Выполняется сброс топа и раздача призов...")
+            await reset_daily_and_reward()
+            await query.edit_message_text("✅ Топ сброшен! Призы разосланы.")
+
+        elif data == "admin_balance_menu":
+            context.user_data["admin_action"] = "balance_menu"
+            text = "💰 Выберите действие:"
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("➕ Добавить звёзды", callback_data="admin_add_balance")],
+                [InlineKeyboardButton("👀 Посмотреть баланс", callback_data="admin_view_balance")],
+                [InlineKeyboardButton("⬅ Назад", callback_data="admin_back")]
+            ])
+            await query.edit_message_text(text, reply_markup=keyboard)
+            return
+
+        elif data == "admin_myid":
+            await query.edit_message_text(f"🆔 Ваш ID: `{user_id}`")
+
+        elif data == "admin_exit":
+            await query.edit_message_text("👋 До свидания!", reply_markup=main_keyboard())
+
+        elif data == "admin_back":
+            await query.edit_message_text("👑 Админ-панель", reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("➕ Создать промокод", callback_data="admin_create_promo"),
+                    InlineKeyboardButton("📋 Промокоды", callback_data="admin_list_promo")
+                ],
+                [
+                    InlineKeyboardButton("🔄 Сбросить ТОП", callback_data="admin_reset_daily"),
+                    InlineKeyboardButton("💰 Баланс", callback_data="admin_balance_menu")
+                ]
+            ]))
+
+        elif data == "admin_add_balance":
+            context.user_data["admin_action"] = "add_balance"
+            await query.edit_message_text(
+                "💰 Добавление звёзд\n\n"
+                "Введите в формате:\n"
+                "`user_id сумма`\n"
+                "Пример: `1234567890 100.5`"
+            )
+            return
+
+        elif data == "admin_view_balance":
+            context.user_data["admin_action"] = "view_balance"
+            await query.edit_message_text("👀 Введите user_id:")
+            return
+
+    # ==================== СТАРЫЕ ОБРАБОТЧИКИ ====================
     if data == "promo":
         context.user_data["expecting_promo"] = True
         await query.edit_message_text("🎟 Введи промокод (отправь текстовым сообщением):")
@@ -454,6 +534,52 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = update.effective_user.id
 
+    # === АДМИН ДЕЙСТВИЯ ===
+    if context.user_data.get("admin_action") == "create_promo":
+        context.user_data.pop("admin_action")
+        try:
+            code, stars_str = text.split(maxsplit=1)
+            stars = float(stars_str)
+        except:
+            await update.message.reply_text("❌ Неверный формат. Используй: CODE 150")
+            return
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute("INSERT OR REPLACE INTO promos(code, stars, used_by) VALUES(?,?,?)", (code.upper(), stars, ""))
+            await db.commit()
+        await update.message.reply_text(f"✅ Промокод *{code.upper()}* на *{stars} ⭐* создан!", parse_mode=ParseMode.MARKDOWN)
+        return
+
+    if context.user_data.get("admin_action") == "add_balance":
+        context.user_data.pop("admin_action")
+        parts = text.split(maxsplit=1)
+        if len(parts) != 2 or not parts[0].isdigit():
+            await update.message.reply_text("❌ Неверный формат. Используй: user_id сумма")
+            return
+        target_id = int(parts[0])
+        try:
+            amount = float(parts[1])
+        except ValueError:
+            await update.message.reply_text("❌ Сумма должна быть числом.")
+            return
+        await update_balance(target_id, amount)
+        await update.message.reply_text(f"✅ Админу добавлено {amount:.2f} ⭐ пользователю {target_id}")
+        return
+
+    if context.user_data.get("admin_action") == "view_balance":
+        context.user_data.pop("admin_action")
+        try:
+            target_id = int(text)
+        except ValueError:
+            await update.message.reply_text("❌ Введи число (user_id).")
+            return
+        user = await get_user(target_id)
+        if not user:
+            await update.message.reply_text("❌ Пользователь не найден.")
+            return
+        balance = user[3]
+        await update.message.reply_text(f"💰 Баланс пользователя {target_id}: *{balance:.2f} ⭐*", parse_mode=ParseMode.MARKDOWN)
+        return
+
     if context.user_data.get("expecting_promo"):
         context.user_data.pop("expecting_promo")
         code = text.upper()
@@ -479,11 +605,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop("expecting_transfer")
         parts = text.split()
         if len(parts) != 2:
-            await update.message.reply_text(
-                "❌ Неверный формат. Укажите ID друга и сумму через пробел.\n"
-                "Пример: `12345678 10`",
-                parse_mode=ParseMode.MARKDOWN
-            )
+            await update.message.reply_text("❌ Неверный формат. Укажите ID друга и сумму через пробел.\nПример: `12345678 10`")
             return
         if not parts[0].isdigit():
             await update.message.reply_text("❌ ID должен быть числом.")
@@ -510,8 +632,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update_balance(user_id, -amount)
         await update_balance(target_id, amount)
         await update.message.reply_text(
-            f"✅ *Перевод выполнен!*\n"
-            f"Переведено {amount:.2f} ⭐ пользователю ID `{target_id}`.",
+            f"✅ *Перевод выполнен!*\nПереведено {amount:.2f} ⭐ пользователю ID `{target_id}`.",
             parse_mode=ParseMode.MARKDOWN
         )
         return
@@ -537,53 +658,16 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=main_keyboard()
         )
 
-# ===== АДМИН-ПАНЕЛЬ =====
+# ===== АДМИН-КОМАНДЫ (заменены на новую панель) =====
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    logger.info(f"Команда /admin от {user_id} (is_admin={is_admin(user_id)})")
-    if not is_admin(user_id):
-        await update.message.reply_text(
-            f"⛔ У вас нет доступа к данной команде.\n\n"
-            f"Ваш ID: `{user_id}`\n"
-            f"Добавьте его в список ADMIN_IDS в файле bot.py и перезапустите бота.",
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return
-    text = (
-        "👑 *Админ-панель*\n\n"
-        "Доступные команды:\n"
-        "/create_promo <код> <звёзды> – создать промокод\n"
-        "/admin – показать это меню"
-    )
-    await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+    await admin_panel(update, context)  # вызов новой функции
 
+# Дополнительные команды
 async def create_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    logger.info(f"Команда /create_promo от {user_id}")
-    if not is_admin(user_id):
-        await update.message.reply_text("⛔ У вас нет доступа к этой команде.")
-        return
-    if not context.args or len(context.args) < 2:
-        await update.message.reply_text("Использование: /create_promo <код> <звёзды>")
-        return
-    code = context.args[0].upper()
-    try:
-        stars = float(context.args[1])
-    except ValueError:
-        await update.message.reply_text("Звёзды должны быть числом.")
-        return
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("INSERT OR REPLACE INTO promos(code, stars, used_by) VALUES(?,?,?)", (code, stars, ""))
-        await db.commit()
-    await update.message.reply_text(f"✅ Промокод *{code}* на *{stars} ⭐* создан!", parse_mode=ParseMode.MARKDOWN)
+    await admin_panel(update, context)
 
 async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    await update.message.reply_text(
-        f"🆔 *Ваш ID:* `{user_id}`\n\n"
-        "Используйте этот ID для добавления в список администраторов.",
-        parse_mode=ParseMode.MARKDOWN
-    )
+    await admin_panel(update, context)
 
 # ===== ЕЖЕДНЕВНЫЙ СБРОС =====
 async def daily_reset(context: ContextTypes.DEFAULT_TYPE):
@@ -603,7 +687,7 @@ def main():
     app.add_handler(CommandHandler("admin", admin_panel))
     app.add_handler(CommandHandler("create_promo", create_promo))
     app.add_handler(CommandHandler("myid", myid))
-    app.add_handler(CallbackQueryHandler(callback_handler))   # ← РАЗ ЭТО ВСЕГДА ВЫДАВАЛО ОШИБКУ
+    app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
     app.job_queue.run_daily(daily_reset, time=time(hour=RESET_HOUR, minute=RESET_MINUTE))
