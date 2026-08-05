@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from datetime import datetime, time
 
 import aiosqlite
@@ -544,7 +545,14 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     app.job_queue.run_daily(daily_reset, time=time(hour=RESET_HOUR, minute=RESET_MINUTE))
     logging.info("Бот инициализирован и готов к работе")
-    await app.run_polling()
+
+    webhook_url = os.getenv("WEBHOOK_URL")
+    if webhook_url:
+        port = int(os.getenv("PORT", 8080))
+        await app.bot.set_webhook(url=webhook_url)
+        await app.run_webhook(listen="0.0.0.0", port=port)
+    else:
+        await app.run_polling()
 
 if __name__ == "__main__":
     asyncio.run(main())
