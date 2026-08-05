@@ -34,7 +34,10 @@ TOP_PRIZES = {
 RESET_HOUR = 0
 RESET_MINUTE = 0
 
-ADMIN_ID = 123456789  # замените на свой ID
+ADMIN_IDS = [123456789, 5078387190]
+
+def is_admin(user_id: int) -> bool:
+    return user_id in ADMIN_IDS
 
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
@@ -511,7 +514,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if user_id != ADMIN_ID:
+    if not is_admin(user_id):
         await update.message.reply_text("⛔ У вас нет доступа к данной команде.")
         return
     text = (
@@ -524,7 +527,8 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
 async def create_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    user_id = update.effective_user.id
+    if not is_admin(user_id):
         await update.message.reply_text("⛔ У вас нет доступа к этой команде.")
         return
     if not context.args or len(context.args) < 2:
