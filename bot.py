@@ -17,7 +17,7 @@ from telegram.ext import (
 from telegram.constants import ParseMode
 
 # ===== Конфигурация =====
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("8675621032:AAHKU2EeS0GMw5eWCG8T-zMYYVv6vLvUiN0")
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не задан!")
 
@@ -38,10 +38,17 @@ TOP_PRIZES = {
 RESET_HOUR = 0
 RESET_MINUTE = 0
 
-ADMIN_IDS = [8798104630, 5078387190]  # ЗАМЕНИ НА СВОИ
+ADMIN_IDS = [8798104630, 5078387190]  # ⚠️ ЗАМЕНИТЕ НА СВОЙ ID (получите через @userinfobot)
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
+
+# ===== Настройка логирования =====
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 # ===== БД =====
 async def init_db():
@@ -149,6 +156,7 @@ def main_keyboard():
 
 # ===== Обработчики =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"Команда /start от {update.effective_user.id}")
     user = update.effective_user
     user_id = user.id
     args = context.args
@@ -512,6 +520,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # Обработка кнопок меню
     if text == "✨ Кликер звёзд":
         await clicker_handler(update, context)
     elif text == "👤 Профиль":
@@ -532,9 +541,10 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=main_keyboard()
         )
 
-# ===== Админ-команды =====
+# ===== АДМИН-КОМАНДЫ (с логами) =====
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    logger.info(f"Команда /admin от {user_id} (is_admin={is_admin(user_id)})")
     if not is_admin(user_id):
         await update.message.reply_text("⛔ У вас нет доступа к данной команде.")
         return
@@ -549,6 +559,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def create_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    logger.info(f"Команда /create_promo от {user_id}")
     if not is_admin(user_id):
         await update.message.reply_text("⛔ У вас нет доступа к этой команде.")
         return
@@ -566,25 +577,20 @@ async def create_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await db.commit()
     await update.message.reply_text(f"✅ Промокод *{code}* на *{stars} ⭐* создан!", parse_mode=ParseMode.MARKDOWN)
 
+# ===== Ежедневный сброс =====
 async def daily_reset(context: ContextTypes.DEFAULT_TYPE):
     prizes = await reset_daily_and_reward()
-    logging.info(f"Топ сброшен, награды: {prizes}")
+    logger.info(f"Топ сброшен, награды: {prizes}")
 
-# ===== ГЛАВНАЯ ФУНКЦИЯ (с ручным циклом) =====
-logging.basicConfig(level=logging.INFO)
-
+# ===== ГЛАВНАЯ ФУНКЦИЯ =====
 def main():
-    # Создаём и устанавливаем цикл событий
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    # Инициализация БД
     loop.run_until_complete(init_db())
 
-    # Сборка приложения
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # Регистрация обработчиков
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("admin", admin_panel))
     app.add_handler(CommandHandler("create_promo", create_promo))
@@ -592,9 +598,8 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     app.job_queue.run_daily(daily_reset, time=time(hour=RESET_HOUR, minute=RESET_MINUTE))
 
-    logging.info("Бот инициализирован и готов к работе")
+    logger.info("Бот инициализирован и готов к работе")
 
-    # Запуск
     webhook_url = os.getenv("WEBHOOK_URL")
     if webhook_url:
         loop.run_until_complete(app.bot.set_webhook(url=webhook_url))
