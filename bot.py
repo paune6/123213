@@ -436,18 +436,18 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(f"❌ Недостаточно звёзд. Нужно {price} ⭐, у тебя {user[3]:.2f}.")
             return
         try:
-            available = await context.bot.get_available_gifts()
-        except Exception as e:
-            await query.edit_message_text(f"Ошибка при получении списка подарков: {e}")
-            return
-        matching = [g for g in available if g.total_amount == price]
-        if not matching:
-            await query.edit_message_text(f"❌ К сожалению, подарков стоимостью {price} ⭐ сейчас нет в наличии.")
-            return
-        gift = matching[0]
-        await update_balance(user_id, -price)
-        try:
-            await context.bot.send_gift(chat_id=user_id, gift_id=gift.id, text="🎁 Поздравляем! Это ваш подарок от бота!")
+            gifts = await context.bot.get_available_gifts()
+            matching = [g for g in gifts if g.total_amount == price]
+            if not matching:
+                await query.edit_message_text(f"❌ К сожалению, подарков стоимостью {price} ⭐ сейчас нет в наличии.")
+                return
+            gift = matching[0]
+            await update_balance(user_id, -price)
+            await context.bot.send_gift(
+                chat_id=user_id,
+                gift_id=gift.id,
+                text="🎁 Поздравляем! Это ваш подарок от бота!"
+            )
             await query.edit_message_text(f"✅ *Подарок успешно отправлен!* Списано {price} ⭐.\nНаслаждайся! 🎉")
         except Exception as e:
             await update_balance(user_id, price)
