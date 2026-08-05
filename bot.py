@@ -603,7 +603,7 @@ def main():
     app.add_handler(CommandHandler("admin", admin_panel))
     app.add_handler(CommandHandler("create_promo", create_promo))
     app.add_handler(CommandHandler("myid", myid))
-    app.add_handler(CallbackQueryHandler(callback_handler))
+    app.add_handler(CallbackQueryHandler(callback_handler))   # ← РАЗ ЭТО ВСЕГДА ВЫДАВАЛО ОШИБКУ
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
     app.job_queue.run_daily(daily_reset, time=time(hour=RESET_HOUR, minute=RESET_MINUTE))
