@@ -19,8 +19,6 @@ BOT_TOKEN = "8675621032:AAHKU2EeS0GMw5eWCG8T-zMYYVv6vLvUiN0"  # ваш токе�
 DB_PATH = "bot_database.db"
 BOT_USERNAME = None
 
-# Подписка полностью удалена – больше нет REQUIRED_CHANNELS
-
 CLICKER_COOLDOWN = 180
 CLICKER_REWARD = 0.20
 
@@ -784,6 +782,10 @@ async def setup():
     logging.info("Бот инициализирован")
     return app
 
+# ---------- ГЛАВНАЯ ТОЧКА ВХОДА ----------
+async def main():
+    app = await setup()
+    await app.run_polling_async()
+
 if __name__ == "__main__":
-    app = asyncio.run(setup())
-    asyncio.run(app.run_polling())
+    asyncio.run(main())
