@@ -17,9 +17,8 @@ from telegram.ext import (
 from telegram.constants import ParseMode
 
 # ===== Конфигурация =====
-BOT_TOKEN = os.getenv("8675621032:AAHKU2EeS0GMw5eWCG8T-zMYYVv6vLvUiN0")
-if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN не задан!")
+# ТОКЕН ВСТАВЛЕН ПРЯМО (БЕЗ os.getenv)
+BOT_TOKEN = "8675621032:AAHKU2EeS0GMw5eWCG8T-zMYYVv6vLvUiN0"
 
 DB_PATH = "bot_database.db"
 
@@ -38,7 +37,8 @@ TOP_PRIZES = {
 RESET_HOUR = 0
 RESET_MINUTE = 0
 
-ADMIN_IDS = [8798104630, 5078387190]  # ⚠️ ЗАМЕНИТЕ НА СВОЙ ID (получите через @userinfobot)
+# ⚠️ ЗДЕСЬ УКАЖИТЕ СВОИ ID (получите через /myid у бота)
+ADMIN_IDS = [8798104630, 5078387190]  # замените на свои
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
@@ -546,7 +546,13 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     logger.info(f"Команда /admin от {user_id} (is_admin={is_admin(user_id)})")
     if not is_admin(user_id):
-        await update.message.reply_text("⛔ У вас нет доступа к данной команде.")
+        # Выводим ID, чтобы пользователь мог его скопировать
+        await update.message.reply_text(
+            f"⛔ У вас нет доступа к данной команде.\n\n"
+            f"Ваш ID: `{user_id}`\n"
+            f"Добавьте его в список `ADMIN_IDS` в файле `bot.py` и перезапустите бота.",
+            parse_mode=ParseMode.MARKDOWN
+        )
         return
     text = (
         "👑 *Админ-панель*\n\n"
@@ -577,6 +583,15 @@ async def create_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await db.commit()
     await update.message.reply_text(f"✅ Промокод *{code}* на *{stars} ⭐* создан!", parse_mode=ParseMode.MARKDOWN)
 
+# ===== Новая команда для получения своего ID =====
+async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    await update.message.reply_text(
+        f"🆔 *Ваш ID:* `{user_id}`\n\n"
+        "Используйте этот ID для добавления в список администраторов.",
+        parse_mode=ParseMode.MARKDOWN
+    )
+
 # ===== Ежедневный сброс =====
 async def daily_reset(context: ContextTypes.DEFAULT_TYPE):
     prizes = await reset_daily_and_reward()
@@ -594,6 +609,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("admin", admin_panel))
     app.add_handler(CommandHandler("create_promo", create_promo))
+    app.add_handler(CommandHandler("myid", myid))  # новая команда
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     app.job_queue.run_daily(daily_reset, time=time(hour=RESET_HOUR, minute=RESET_MINUTE))
