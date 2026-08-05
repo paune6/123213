@@ -19,12 +19,12 @@ BOT_TOKEN = "8675621032:AAHKU2EeS0GMw5eWCG8T-zMYYVv6vLvUiN0"  # ваш токе�
 DB_PATH = "bot_database.db"
 BOT_USERNAME = None
 
-REQUIRED_CHANNELS = ["@pavelgifsts"]  # Только этот канал обязателен
+REQUIRED_CHANNELS = ["@pavelgifsts"]  # Только этот канал
 
-CLICKER_COOLDOWN = 180   # 3 минуты
+CLICKER_COOLDOWN = 180
 CLICKER_REWARD = 0.20
 
-REFERRAL_BONUS = 1.0          # 1 звезда за реферала
+REFERRAL_BONUS = 1.0
 OLD_FRIENDS_BONUS = 2.0
 DAILY_BIO_BONUS = 1.0
 
@@ -224,7 +224,7 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
             if member.status in ("left", "kicked"):
                 not_subscribed.append(channel)
         except Exception:
-            not_subscribed.append(channel)   # если не удалось проверить – считаем не подписанным
+            not_subscribed.append(channel)
 
     if not_subscribed:
         channels_text = ", ".join(not_subscribed)
@@ -351,7 +351,6 @@ async def profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user:
         await update.message.reply_text("Сначала /start")
         return
-    # user: (id, username, first_name, balance, invited_by, total_invites, activated_count, daily_invites, last_click_time, last_daily_bonus, claimed_old_friends_bonus)
     username = user[1] or ""
     first_name = user[2] or "Пользователь"
     balance = user[3]
@@ -650,7 +649,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_subscription(update, context):
         return
 
-    # Ожидание ввода промокода
     if context.user_data.get("expecting_promo"):
         context.user_data.pop("expecting_promo")
         code = text.upper()
@@ -672,7 +670,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ Промокод активирован! +{stars:.0f}⭐️")
         return
 
-    # Ожидание перевода звёзд
     if context.user_data.get("expecting_transfer"):
         context.user_data.pop("expecting_transfer")
         parts = text.split()
@@ -704,7 +701,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ Переведено {amount:.2f}⭐️ пользователю ID{target_id}")
         return
 
-    # Кнопки главного меню
     if text == "✨ Кликер звезд":
         await clicker_handler(update, context)
     elif text == "👤 Профиль":
@@ -722,7 +718,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "⭐ Отзывы":
         await reviews_handler(update, context)
 
-    # Админ-панель
     elif user_id == ADMIN_ID:
         if text == "📊 Статистика":
             total_users = await get_total_users_count()
@@ -836,8 +831,13 @@ async def setup():
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
+    # Настройка JobQueue (если установлен)
     job_queue = app.job_queue
-    job_queue.run_daily(daily_reset, time=time(hour=RESET_HOUR, minute=RESET_MINUTE))
+    if job_queue:
+        job_queue.run_daily(daily_reset, time=time(hour=RESET_HOUR, minute=RESET_MINUTE))
+        logging.info("✅ JobQueue настроен, ежедневный сброс активен.")
+    else:
+        logging.warning("⚠️ JobQueue не установлен. Ежедневный сброс топа не будет работать. Установите python-telegram-bot[job-queue].")
 
     logging.info("Бот инициализирован")
     return app
