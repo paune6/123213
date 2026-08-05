@@ -204,7 +204,7 @@ async def clicker_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await set_field(user_id, "last_click_time", now.isoformat())
     await update.message.reply_text(
         f"✨ Клик успешен!\n\nВы получили *{CLICKER_REWARD:.2f} ⭐* за специальное задание.\n"
-        f"Твой баланс пополнен. Возвращайся через 3 минуты за новой нарядой! 🚀",
+        f"Твой баланс пополнен. Возвращайся через 3 минуты за новой наградой! 🚀",
         parse_mode=ParseMode.MARKDOWN
     )
 
@@ -340,7 +340,7 @@ async def reviews_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.MARKDOWN
     )
 
-# ===== CALLBACK (админ-панель + старые функции) =====
+# ===== CALLBACK =====
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -415,7 +415,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("👀 Введите user_id:")
             return
 
-    # ==================== СТАРЫЕ КОЛБЭКИ ====================
     if data == "promo":
         context.user_data["expecting_promo"] = True
         await query.edit_message_text("🎟 Введи промокод (отправь текстовым сообщением):")
@@ -508,7 +507,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 gift_id=gift.id,
                 text="🎁 Поздравляем! Это ваш подарок от бота!"
             )
-            await query.edit_message_text(f"✅ *Поддарок успешно отправлен!* Списано {price} ⭐.\nНаслаждайся! 🎉")
+            await query.edit_message_text(f"✅ *Подарок успешно отправлен!* Списано {price} ⭐.\nНаслаждайся! 🎉")
         except Exception as e:
             await update_balance(user_id, price)
             await query.edit_message_text(f"❌ Не удалось отправить подарок: {e}")
@@ -518,7 +517,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = update.effective_user.id
 
-    # === АДМИН ДЕЙСТВИЯ ===
     if context.user_data.get("admin_action") == "create_promo":
         context.user_data.pop("admin_action")
         try:
@@ -621,7 +619,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Обработка кнопок меню
     if text == "✨ Кликер звёзд":
         await clicker_handler(update, context)
     elif text == "👤 Профиль":
@@ -676,7 +673,6 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
 
-# ===== ДОПОЛНИТЕЛЬНЫЕ АДМИН-КОМАНДЫ =====
 async def create_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await admin_panel(update, context)
 
